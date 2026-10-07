@@ -1,0 +1,4 @@
+interface:
+  display_name: "格星图"
+  short_description: "规划并制作星座情感竖屏视频，交付文案、动画、配音、封面与成片"
+  default_prompt: "请用 $gexintu 规划并制作一支情感共鸣星座视频，先写完整逐场导演稿并沿用已确认风格。"

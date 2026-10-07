@@ -1,6 +1,8 @@
-# 变更记录
+# 更新记录
 
-## V1.0.0（2026-10-07）
-
-- 首次入库（用户 2026-10-07 指示：技能重大改动需同步到 GitHub，本技能此前未建仓库）：`SKILL.md`（格星图星座 / 心理分析竖屏视频制作规范，含口播、画面文字、每场「初态 → 变化 → 结果」路线图、时长节奏与交付检查）、`assets/illustrated-motion.html`（动态星刊模板）、`scripts/render_illustrated.py`（渲染脚本）、`references/illustrated-workflow.md`、`references/editorial-demo-direction.md`。
-- 仓库为私有（`cur-line/gexintu-skill`）；事实来源仍是 `/Users/zengzhen/.agents/skills/gexintu`，本仓库随技能更新同步提交。
+## V1.1.0 · 2026-10-07
+- 统一新片少于180秒、12–18画面段与情感叙事基线。
+- 拆分导演、音频、制作验收与策划参考，移除主入口的个人路径和项目进度。
+- 明确封面无口播字幕、音乐可感知、保留动作音效、禁止转场音效。
+- 修复多段换图的cue/素材校验，增加可配置混音响度和最终视频验证脚本。
+- V1.0.0由archive-v1.0.0标签保留；现有模板与渲染器继续支持。

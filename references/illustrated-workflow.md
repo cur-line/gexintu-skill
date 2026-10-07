@@ -15,17 +15,18 @@ python /path/to/gexintu/scripts/render_illustrated.py --project /path/to/episode
 
 `storyboard.json` 顶层：`brand`、`series`、`timing_source`、`voice`（相对工程路径）、`assets`（素材 ID 到相对路径的字典）、`scenes`。
 
-`build/timeline.json` 顶层含 `total` 和 `scenes`。每场含 `id,start,end,duration,narration,words`；words 是 `{t,s,e}` 数组，t 为一个汉字或字符，s/e 是全片绝对秒数。标点不在 words 内。旧工程的估计时间可使用，但需如实标记来源。
+`build/timeline.json` 顶层含 `total` 和 `scenes`。每场含 `id,start,end,duration,narration,words`；words 是 `{t,s,e}` 数组，t 为一个汉字或字符，s/e 是全片绝对秒数。标点不在 words 内。`voice` 是已经混好所需音乐和动作音效的音轨；本脚本不会另外添加BGM或SFX。旧工程的估计时间可使用，但需如实标记来源。
 
 每场画面字段：
 
 - `id`：与时间轴一一对应。
+- `show_captions`：可选布尔值；封面场设为 `false`，只影响此场字幕，不关闭全片字幕。
 - `layout`：标准值为 `hook`、`editorial`、`cinematic` 或 `split-perception`。8 场以上的完整分镜如设置顶层 `require_layout_variety: true`，渲染器会要求至少三种构图且相邻场景不重复；旧分镜可以省略并默认为 `editorial`。工程自定义值要先在校验器和模板两处实现并抽帧验证。
 - `title`：两个短标题字符串的数组。
 - `title_after`：可选的渐进式标题数组，例如 `[{"cue":"明天下午","title":["把时间说清楚","明天下午可以吗"]}]`。cue 必须是本场口播中的连续原文；标题只在 cue 对应的时间点后替换，按口播顺序排列。用于避免开场标题提前展示尚未说出的结论。时间轴若为 `waveform-estimated`，标题触发也只能称估算同步。
 - `image`：主图 ID；`secondary`：双图对比的第二张图 ID。
 - `image_after`：可选 `{cue,asset}`，口播说到 cue 后转入下一幅图。
-- `image_stages`：可选的多段 `{cue,asset}` 数组，用于按多个口播节点连续切换主图；每个 cue 必须在本场口播中，先后顺序要与叙事一致。
+- `image_stages`：可选的多段 `{cue,asset}` 数组，用于按多个口播节点连续切换主图；每个 cue 必须在本场口播中，先后顺序要与叙事一致。与 `image_after` 同时存在时以 `image_stages` 为准；标准双图对照布局保持两张主图，不应用换图段。
 - `mode`：以下表格的演示类型。
 - `cues`：按表格顺序给出的口播原文片段，必须存在于本场 words 中。模板使用首次匹配，同一词重复时应给更长的唯一短语。
 - `labels`：按表格顺序给出的屏幕文字；尽量控制在 12 字内。
@@ -64,3 +65,5 @@ python /path/to/gexintu/scripts/render_illustrated.py --project /path/to/episode
 看图时至少能指出主图在解释什么、演示的哪个对象发生了变化；如果只看到字幕或三行卡片，则需要重新设计。避免同样的图反复作为整片背景，允许有叙事理由地重复人物场景。图片区不压暗到丢失细节，也不覆盖人物面部。对最终 MP4 做全片缩略图检查，并单独检查 0 / 0.3 / 1 / 3 秒，验证首帧非空和前三秒变化；不同 `layout` 标签如果整屏标题、主图、演示区和字幕位置几乎不变，仍视为重复版式。
 
 配音试听报告区分实际听感检查与仅元数据/响度检查；响度达标不能代替主观试听。复查准确的交付 MP4（不是只看源图或中间预览），用 ffprobe 检查规格、解码代表性动态片段，并保留音频来源、字幕对齐方法和素材来源记录。
+
+渲染器默认对输入混音做一次约-14 LUFS、-1.5 dBTP响度处理，可用 `--lufs` 与 `--true-peak` 调整。导出后仍须实测并试听；单遍处理不保证最终编码达到指定真峰。

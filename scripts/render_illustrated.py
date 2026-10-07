@@ -36,15 +36,21 @@ def load_project(project):
         text = ''.join(w['t'] for w in s['words'])
         cues = list(s['cues']) + ([s['image_after']['cue']] if 'image_after' in s else [])
         cues += [stage['cue'] for stage in s.get('title_after', [])]
+        cues += [stage['cue'] for stage in s.get('image_stages', [])]
         for cue in cues:
             if cue not in text:
                 raise ValueError(f"{s['id']}: cue absent: {cue}")
+        for stages in (s.get('image_stages', []), s.get('title_after', [])):
+            positions = [text.index(stage['cue']) for stage in stages]
+            if positions != sorted(set(positions)):
+                raise ValueError(f"{s['id']}: stages must follow distinct narration cues in order")
         for w in s['words']:
             if not s['start'] <= w['s'] <= w['e'] <= s['end'] + .01:
                 raise ValueError(f"{s['id']}: timestamp out of scene bounds")
         media = [s['image']] + s.get('gallery', [])
         if 'secondary' in s: media.append(s['secondary'])
         if 'image_after' in s: media.append(s['image_after']['asset'])
+        media += [stage['asset'] for stage in s.get('image_stages', [])]
         for key in media:
             if key not in spec['assets']:
                 raise ValueError(f"{s['id']}: asset absent: {key}")
@@ -77,6 +83,8 @@ def main():
     ap.add_argument('--preview', help='comma-separated absolute seconds')
     ap.add_argument('--audit', action='store_true')
     ap.add_argument('--render', type=Path)
+    ap.add_argument('--lufs', type=float, default=-14, help='Final mixed-track loudness target (LUFS)')
+    ap.add_argument('--true-peak', type=float, default=-1.5, help='True peak ceiling (dBTP)')
     args = ap.parse_args()
     project = args.project.resolve()
     page, spec, voice = load_project(project)
@@ -105,7 +113,7 @@ def main():
         if args.render:
             out=args.render.resolve();out.parent.mkdir(parents=True,exist_ok=True)
             if out.exists(): raise FileExistsError('Use a new versioned output: '+str(out))
-            command=['ffmpeg','-v','error','-f','image2pipe','-framerate','30','-vcodec','mjpeg','-i','pipe:0','-i',str(voice),'-map','0:v:0','-map','1:a:0','-c:v','libx264','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-af','loudnorm=I=-16:TP=-1.5:LRA=11','-t',str(spec['total']),'-movflags','+faststart',str(out)]
+            command=['ffmpeg','-v','error','-f','image2pipe','-framerate','30','-vcodec','mjpeg','-i','pipe:0','-i',str(voice),'-map','0:v:0','-map','1:a:0','-c:v','libx264','-preset','fast','-crf','19','-pix_fmt','yuv420p','-c:a','aac','-b:a','192k','-af',f'loudnorm=I={args.lufs}:TP={args.true_peak}:LRA=11','-t',str(spec['total']),'-movflags','+faststart',str(out)]
             count=int(spec['total']*30)+1;t0=time.monotonic()
             with subprocess.Popen(command,stdin=subprocess.PIPE) as proc:
                 try:
