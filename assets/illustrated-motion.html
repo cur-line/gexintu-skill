@@ -1,0 +1,152 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8">
+<style>html,body{margin:0;background:#0c1b2b}canvas{display:block;width:1080px;height:1920px}</style>
+<canvas width="1080" height="1920"></canvas><script>
+// Seekable canvas adapter for the existing gexintu renderer; not a native HyperFrames composition.
+const D=/*__DATA__*/null, C=document.querySelector('canvas'),g=C.getContext('2d');
+const P={navy:'#0d2032',paper:'#f4eddf',gold:'#e4b76c',ink:'#182c3b',muted:'#a6bac6',rose:'#c9877a',green:'#94bdb0',panel:'#18374c'};
+const images={};Object.entries(D.assets).forEach(([k,src])=>{let im=new Image();im.src=src;images[k]=im});
+const clamp=x=>Math.max(0,Math.min(1,x)), ease=x=>1-(1-clamp(x))**3, mix=(a,b,t)=>a+(b-a)*t;
+let scene,t,u,A,boxes=[];
+function rr(x,y,w,h,c,r=20){g.fillStyle=c;g.beginPath();g.roundRect(x,y,Math.max(.01,w),Math.max(.01,h),r);g.fill()}
+function circle(x,y,r,c){g.fillStyle=c;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill()}
+function stroke(x,y,X,Y,c=P.gold,w=4,p=1){g.strokeStyle=c;g.lineWidth=w;g.lineCap='round';g.beginPath();g.moveTo(x,y);g.lineTo(mix(x,X,clamp(p)),mix(y,Y,clamp(p)));g.stroke()}
+function text(s,x,y,size=44,color=P.paper,align='left',serif=false,max=880){
+ g.textBaseline='middle';g.textAlign=align;g.fillStyle=color;
+ const family=serif?'"FZXiaoBiaoSong-B05","Songti SC",serif':'"Hiragino Sans GB","PingFang SC",sans-serif';
+ g.font=(serif?'400 ':'700 ')+size+'px '+family;
+ let width=g.measureText(s).width;if(width>max){size*=max/width;g.font=(serif?'400 ':'700 ')+size+'px '+family;width=g.measureText(s).width}
+ const tr=g.getTransform(),left=align==='center'?x-width/2:align==='right'?x-width:x;
+ if(g.globalAlpha>.9)boxes.push({text:s,x:tr.a*left+tr.e,y:tr.d*(y-size*.55)+tr.f,w:width*tr.a,h:size*1.1*tr.d});
+ g.fillText(s,x,y);
+}
+function at(key){let clean=scene.words.map(w=>w.t).join(''),i=clean.indexOf(key);if(i<0)throw Error(scene.id+': missing cue '+key);return scene.words[i].s}
+function liveTitle(){let title=scene.title;for(const stage of (scene.title_after||[])){if(t>=at(stage.cue))title=stage.title;else break}return title}
+function p(i,d=.7){return ease((t-A[i])/d)}
+function appear(i,fn,dir=1){if(t<A[i])return;let q=p(i,.36);g.save();g.globalAlpha=q;g.translate((1-q)*36*dir,0);fn(q);g.restore()}
+function photo(key,x,y,w,h,phase=0,focus=.5,radius=24){let im=images[key];g.save();g.beginPath();g.roundRect(x,y,w,h,radius);g.clip();let scale=Math.max(w/im.width,h/im.height)*(1+.045*clamp(phase)),iw=im.width*scale,ih=im.height*scale;g.drawImage(im,x+(w-iw)*focus,y+(h-ih)*.5,iw,ih);g.restore()}
+function label(s,x,y,w=300,color=P.gold){rr(x,y,w,56,color,10);text(s,x+w/2,y+28,28,P.ink,'center',false,w-30)}
+function bubble(s,x,y,w=690,out=false){rr(x,y,w,90,out?P.gold:P.paper,22);g.fillStyle=out?P.gold:P.paper;g.beginPath();g.moveTo(out?x+w-18:x+18,y+68);g.lineTo(out?x+w+12:x-12,y+84);g.lineTo(out?x+w-18:x+18,y+88);g.fill();text(s,x+28,y+45,39,P.ink,'left',false,w-55)}
+function check(x,y,q,color=P.green){stroke(x-12,y,x-2,y+10,color,6,clamp(q*2));if(q>.5)stroke(x-2,y+10,x+20,y-17,color,6,(q-.5)*2)}
+function dial(x,y,r,minutes,q=1){circle(x,y,r+13,P.panel);g.strokeStyle=P.gold;g.lineWidth=16;g.beginPath();g.arc(x,y,r,-Math.PI/2,-Math.PI/2+Math.PI*2*(minutes/60)*q);g.stroke();for(let i=0;i<12;i++){let a=i*Math.PI/6-Math.PI/2;stroke(x+Math.cos(a)*(r-20),y+Math.sin(a)*(r-20),x+Math.cos(a)*(r-28),y+Math.sin(a)*(r-28),P.muted,2)}text(String(Math.round(minutes)),x,y-7,64,P.paper,'center');text('分钟',x,y+47,25,P.muted,'center')}
+function tickRows(labels,x,y,width){labels.forEach((s,i)=>{let yy=y+i*85;rr(x,yy,width,68,P.panel,12);text(s,x+20,yy+34,30,P.paper,'left',false,width-70);if(t>A[Math.min(i,A.length-1)])check(x+width-35,yy+34,p(Math.min(i,A.length-1)))})}
+function mainPhoto(){
+ if(scene.mode==='split-perception'){photo(scene.image,80,440,445,560,u/scene.duration,.45);photo(scene.secondary,545,440,455,560,u/scene.duration,.5);return}
+ let changed=scene.image_after&&t>=at(scene.image_after.cue),q=changed?ease((t-at(scene.image_after.cue))/.65):0;
+ const box=scene.layout==='hook'?{x:0,y:410,w:1080,h:630,r:0}:scene.layout==='cinematic'?{x:0,y:425,w:1080,h:705,r:0}:{x:80,y:440,w:920,h:594,r:24};
+ photo(scene.image,box.x,box.y,box.w,box.h,u/scene.duration,.5,box.r);
+ if(scene.layout==='hook'){
+  let grad=g.createLinearGradient(0,0,0,500);grad.addColorStop(0,'rgba(8,20,31,.64)');grad.addColorStop(.62,'rgba(8,20,31,.1)');grad.addColorStop(1,'rgba(8,20,31,0)');g.fillStyle=grad;g.fillRect(0,0,1080,500)
+ }
+ if(scene.layout==='cinematic'){
+  let grad=g.createLinearGradient(0,820,0,1135);grad.addColorStop(0,'rgba(13,32,50,0)');grad.addColorStop(1,'rgba(13,32,50,.7)');g.fillStyle=grad;g.fillRect(0,820,1080,315)
+ }
+ if(changed){g.save();g.globalAlpha=q;photo(scene.image_after.asset,box.x,box.y,box.w,box.h,u/scene.duration,.5,box.r);g.restore()}
+}
+function drawDemo(){const L=scene.labels;
+ switch(scene.mode){
+ case 'battery':{
+  bubble(L[0],615,490,320,true);
+  text('你没有说出口的状态',100,1100,32,P.muted);
+  const level=t<A[0]?1:mix(1,.14,p(0,1.7));
+  rr(108,1160,670,155,P.panel,22);rr(784,1200,20,70,P.muted,5);
+  for(let i=0;i<8;i++){let on=level>(i+.4)/8;rr(128+i*78,1182,63,110,on?P.gold:'#294454',9)}
+  appear(1,()=>text(L[1],100,1400,52,P.gold));break;
+ }
+ case 'erase-send':{
+  const hook=scene.layout==='hook',started=t>=A[0];
+  if(hook){rr(72,930,936,550,'rgba(13,32,50,.94)',30);text('一条消息',112,974,25,P.muted);g.save();g.globalAlpha=started?1:0;g.translate(0,started?0:18);bubble(L[0],112,1010,650,false);g.restore();
+   let typed='';if(t>=A[1])typed=L[1].slice(0,Math.floor(clamp((t-A[1])/Math.max(.25,A[2]-A[1]-.12))*L[1].length));if(t>=A[2])typed=L[1].slice(0,Math.ceil((1-clamp((t-A[2])/Math.max(.2,A[3]-A[2])))*L[1].length));
+   rr(104,1200,652,88,'#dce5e6',16);text(typed+(t<A[3]&&Math.floor(t*3)%2?'│':''),132,1244,32,P.ink,'left',false,585);rr(778,1200,170,88,t<A[3]?'#c9d2cf':P.green,16);text('发送',863,1244,31,P.ink,'center');
+   if(t>=A[3]){let q=p(3,.3);g.save();g.globalAlpha=q;g.translate((1-q)*45,0);bubble(L[2],642,1310,300,true);g.restore();check(965,1338,p(3,.3))}
+  }else{
+   if(!started){label('事情做完了，饭还没吃',110,941,490);break}
+   rr(80,1068,920,414,P.paper,25);text('消息',112,1104,25,'#677e89');bubble(L[0],124,1146,570,false);
+   let typed=t<A[1]?'':L[1].slice(0,Math.floor(clamp((t-A[1])/Math.max(.2,A[2]-A[1]-.15))*L[1].length));if(t>=A[2])typed=L[1].slice(0,Math.ceil((1-clamp((t-A[2])/Math.max(.2,A[3]-A[2])))*L[1].length));
+   rr(116,1340,650,82,'#dce5e6',15);text(typed+(t<A[3]&&Math.floor(t*3)%2?'│':''),140,1381,34,P.ink,'left',false,580);rr(794,1340,150,82,t<A[3]?'#c9d2cf':P.green,15);text('发送',869,1381,32,P.ink,'center');
+   if(t>=A[3]){let q=p(3,.45);g.save();g.globalAlpha=q;g.translate((1-q)*85,(1-q)*50);bubble(L[2],640,1246,290,true);g.restore();check(960,1390,p(3,.4))}
+  }break;
+ }
+ case 'queue':{
+  text('总是把自己的感受往后排',100,1102,34,P.muted);
+  let q=p(1,1.0);let x=mix(535,655,q),w=mix(405,275,q);
+  rr(100,1160,405,145,P.gold);text(L[0],302,1232,42,P.ink,'center');
+  rr(x,1160,w,145,P.panel);text(L[1],x+w/2,1232,36,P.paper,'center',false,w-30);
+  if(t>A[1]){stroke(526,1232,x-14,1232,P.rose,8,q);stroke(x-30,1218,x-14,1232,P.rose,6,q);stroke(x-30,1246,x-14,1232,P.rose,6,q)}
+  appear(2,()=>{label(L[2],655,1342,275,P.rose);text('感受被延后',100,1400,44,P.paper)});break;
+ }
+ case 'schedule':{
+  text('下班后的时间，本来已经排好了',100,1100,33,P.muted);
+  let q=p(1,1.2),extra=270*q,rest=330-extra;
+  rr(100,1190,470,142,P.gold,14);rr(580,1190,extra||1,142,P.rose,14);rr(590+extra,1190,Math.max(rest,1),142,P.green,14);
+  text('原定工作',325,1260,40,P.ink,'center');if(q>.35)text('临时帮忙',580+extra/2,1260,35,P.ink,'center',false,Math.max(10,extra-20));if(rest>130)text('休息',590+extra+rest/2,1260,35,P.ink,'center');
+  ['18:00','20:00','22:00'].forEach((s,i)=>text(s,100+i*410,1148,26,P.muted,i===2?'right':'left'));
+  if(t>A[1]&&q<.98){let y=mix(1050,1170,q);g.save();g.globalAlpha=1-q;label('+ 临时任务',590,y,260,P.rose);g.restore()}
+  appear(2,()=>text('休息，被挤到最后',100,1430,48,P.rose));break;
+ }
+ case 'split-perception':{
+  label(L[0],100,940,240);label(L[1],565,940,240,P.green);
+  const a=t<A[0]?0:p(0),b=t<A[1]?0:p(1);
+  rr(100,1110,390,205,P.panel);rr(565,1110,390,205,P.panel);
+  for(let i=0;i<6;i++){rr(125+i*56,1170,43,90,i<Math.round(a*6)?P.rose:'#284352');rr(590+i*56,1170,43,90,i<Math.round(b*2)?P.green:'#284352')}
+  text('感受到的负担 · 示意',100,1070,27,P.muted);
+  appear(0,()=>text(L[2],100,1380,44,P.rose));appear(1,()=>text(L[3],565,1380,44,P.green));break;
+ }
+ case 'reschedule':{
+  let q=p(2,1.0);rr(100,1090,410,350,P.paper);rr(550,1090,410,350,P.paper);
+  text(L[0],130,1130,32,P.ink);text(L[1],580,1130,32,P.ink);
+  [0,1,2].forEach(i=>{stroke(130,1200+i*70,480,1200+i*70,'#c3cbc6',2);stroke(580,1200+i*70,930,1200+i*70,'#c3cbc6',2)});
+  rr(128,1240,354,78,P.green);text(L[3],305,1279,33,P.ink,'center');
+  rr(mix(128,578,q),mix(1240,1180,q),354,78,P.gold);text(L[2],mix(305,755,q),mix(1279,1219,q),35,P.ink,'center');
+  if(t>A[2]){check(910,1380,p(2));text('把约定移到能做到的时间',100,1470,33,P.gold)}break;
+ }
+ case 'chat-stop':{
+  appear(0,()=>bubble(L[0],100,1090,570));appear(1,()=>bubble(L[1],640,1203,310,true),-1);
+  if(t>A[2]){let q=p(2);g.save();g.globalAlpha=q;g.strokeStyle=P.muted;g.setLineDash([7,9]);g.lineWidth=2;g.strokeRect(100,1340,840,100);g.setLineDash([]);text(L[2],125,1390,36,P.muted);g.restore()}
+  if(t>A[3]){label('对话停住了',660,957,290,P.rose)}break;
+ }
+ case 'listen-timer':{
+  if(t>A[0]){label(L[0],110,950,360)}
+  if(t>A[1]){dial(265,1253,126,10,p(1,1.4));text('留十分钟给彼此',465,1170,43,P.paper);text('听我说一会儿',465,1250,42,P.gold)}
+  if(t>A[2]){text(L[2],465,1360,32,P.muted);check(932,1360,p(2))}
+  // A moving listening waveform is illustrative, not a measured audio waveform.
+  if(t>A[1])for(let j=0;j<18;j++){let h=10+30*(.5+.5*Math.sin(u*3+j*.9));stroke(477+j*24,1430-h/2,477+j*24,1430+h/2,P.green,8)}break;
+ }
+ case 'calendar':{
+  text('记录一天，不给自己打总分',100,1095,35,P.muted);
+  for(let j=0;j<7;j++){let x=100+j*125;rr(x,1160,108,160,j===6?P.paper:P.panel,12);text(['一','二','三','四','五','六','日'][j],x+54,1200,28,j===6?P.ink:P.muted,'center');if(j<6&&t>A[0]+j*.16)check(x+52,1260,ease((t-A[0]-j*.16)/.4));if(j===6&&t>A[1]){stroke(x+35,1240,x+70,1275,P.rose,5,p(1));stroke(x+70,1240,x+35,1275,P.rose,5,p(1))}}
+  appear(2,()=>text(L[2],100,1410,41,P.gold));break;
+ }
+ case 'timer-switch':{
+  let active=t>=A[1],q=p(1,Math.max(.4,A[2]-A[1])),minutes=mix(30,5,q);dial(300,1250,145,minutes,t<A[0]?0:p(0,1.0));
+  text(active?L[1]:L[0],575,1140,38,P.muted);text(active?'复习五分钟':'学习半小时',575,1223,48,P.gold,'left',false,400);
+  rr(575,1310,380,18,'#31485a',9);rr(575,1310,mix(380,64,q),18,P.gold,9);
+  appear(3,()=>text(L[2],575,1400,36,P.paper));break;
+ }
+ case 'choice-gallery':{
+  for(let j=0;j<3;j++){let x=80+j*314;photo(scene.gallery[j],x,1100,292,210,p(j));text(L[j],x+146,1370,32,t>=A[j]?P.gold:P.muted,'center',false,286);if(t>=A[j])check(x+249,1334,p(j))}
+  if(t>A[3]){let q=p(3);g.strokeStyle=P.gold;g.lineWidth=5;g.beginPath();g.roundRect(76,1096,300,310,20);g.stroke();text('选一个就够了',100,1465,35,P.gold)}break;
+ }
+ case 'reply':{
+  appear(0,()=>bubble(L[0],100,1090,500));appear(1,()=>bubble(L[1],315,1220,625,true),-1);
+  appear(2,()=>text(L[2],540,1440,44,P.gold,'center',true));break;
+ }
+ default:throw Error('Unknown demonstration mode '+scene.mode);
+ }}
+function captions(){const groups=[];let offset=0;for(let phrase of scene.narration.split(/[，。！？；：、,.!?;:]/).filter(Boolean)){let size=Math.ceil(phrase.length/Math.ceil(phrase.length/13));for(let j=0;j<phrase.length;j+=size)groups.push(scene.words.slice(offset+j,offset+Math.min(phrase.length,j+size)));offset+=phrase.length}let current=groups.find(a=>a.length&&t>=a[0].s&&t<a.at(-1).e+.03);if(current){rr(72,1550,936,132,P.paper,22);text(current.map(w=>w.t).join(''),540,1616,59,P.ink,'center',false,880)}}
+function renderAt(time){t=time;scene=D.scenes.findLast(s=>s.start<=t)||D.scenes[0];u=t-scene.start;A=scene.cues.map(at);boxes=[];g.globalAlpha=1;g.setTransform(1,0,0,1,0,0);g.fillStyle=P.navy;g.fillRect(0,0,1080,1920);
+ if(scene.layout==='hook'){
+  text(D.brand+' / '+D.series,76,153,25,P.paper);text('01',1000,153,27,P.gold,'right');
+  const phase=t<A[1]?0:t<A[2]?1:t<A[3]?2:3;
+  const lines=[['有人问你','最近怎么样？'],['你打了一长串','还没发出去'],['最后只回两个字','再想一下…'],['最后只回两个字','还好。']][phase];
+  text(lines[0],78,245,82,P.paper,'left',true,930);text(lines[1],78,340,82,P.gold,'left',true,930)
+ }else{
+  text(D.brand+' / '+D.series,84,164,27,P.muted);text(String(D.scenes.indexOf(scene)+1).padStart(2,'0'),990,164,27,P.gold,'right');
+  const title=liveTitle();text(title[0],84,272,78,P.paper,'left',true,910);text(title[1],84,370,78,P.gold,'left',true,910)
+ }
+ mainPhoto();drawDemo();captions();
+ text('格星图',84,1758,26,P.muted);text('把生活里的感受，看清一点',996,1758,24,P.muted,'right');
+ window.__textAudit=boxes;
+}
+window.renderAt=renderAt;
+Promise.all([...Object.values(images).map(im=>im.decode()),document.fonts.ready]).then(()=>{window.__ready=true;renderAt(0)});
+</script></html>
