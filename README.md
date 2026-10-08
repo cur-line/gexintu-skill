@@ -25,4 +25,4 @@ python3 scripts/verify_delivery.py /path/to/episode/outputs/video-v2.mp4
 
 公开仓库只包含规范、代码和模板，不包含成片、私有参考音频、人物素材或服务密钥。服务凭据使用外部环境配置；引用素材和克隆音频须在当前项目中获得适当使用授权。
 
-版本：V1.1.0。历史V1.0.0保留于 `archive-v1.0.0` 标签，可用 `git show archive-v1.0.0:SKILL.md` 查阅；旧个人路径与过期参数只作历史记录。
+版本：V1.2.0。沉淀 9 大内容栏目与 222 条选题库于 `references/content-system-and-topics.md`。历史V1.0.0保留于 `archive-v1.0.0` 标签，可用 `git show archive-v1.0.0:SKILL.md` 查阅；旧个人路径与过期参数只作历史记录。
